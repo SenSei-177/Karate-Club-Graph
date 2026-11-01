@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 #%%
 G = nx.karate_club_graph()
 fish = []
+e = 3
 
 def Calc_B (A,m):
     global fish
@@ -15,24 +16,34 @@ def Calc_B (A,m):
     return B
 
 def Mod (B , m):
-    eigvalues , eigvectors = np.linalg.eigh(B)
-    ev_max = np.max(eigvalues)
+    eigvalues , eigvectors = np.linalg.eig(B)
+    global fish
+    
+    try:
+        ev_max = np.max(eigvalues)
+    except ValueError:
+        ev_max = -1
+    fish.append(ev_max)
+    
     if ev_max > 0:
-        ev_max = np.argmax(eigvalues)
-        u = eigvectors[:,ev_max]
-        s = ((u > 0).astype(int) * 2) - 1
+        ev_maxid = np.argmax(eigvalues)
+        u = eigvectors[:,ev_maxid]
+        s = ((u >= 0).astype(int) * 2) - 1
+        fish.append(s)
         return s
     else:
-        return np.zeros(34)
+        return np.zeros(1)
 
-def parti (A, m):
+def parti (A,g,m):
+    global fish
     B = Calc_B(A, m)
     s = Mod(B, m)
     
-    if s.any() == False:
-        C1, C2 = [0], [0]
+    if s.any() == bool(np.False_) :
+        C1, C2 = [], []
+        
     else:
-        community_dict = {node:int(val) for node, val in zip(G.nodes(), s.flatten())}
+        community_dict = {node:int(val) for node, val in zip(g.nodes(), s.flatten())}
         C1, C2 = [], []
         for i in community_dict.keys():
             if community_dict[i] == 1:
@@ -40,73 +51,95 @@ def parti (A, m):
             elif community_dict[i] == -1:
                 C2.append(i)
     return C1, C2
-        
-def graph(G):
-    global fish
-    H = G.copy()
-    I = G.copy()
-    J = G.copy()
-    K = G.copy()
+
+def re(A,C1,C2):
+        H = G.copy()
+        I = G.copy()
+        J = G.copy()
+        K = G.copy()
     
-    A = nx.to_numpy_array(G, weight="none") #into numpy matrix 
-    m = (np.sum(A))/2 #total edges
-    fish.append(A)
-    C1, C2 = parti(A, m)
-    fish.append((C1,C2))
-    
-    if len(C1) == 0:
-        return G
-    else:
         H.remove_nodes_from(C1)
         I.remove_nodes_from(C2)
-        
+
         J.remove_edges_from(H.edges(data=True))
         J.remove_edges_from(I.edges(data=True))
         K.remove_edges_from(J.edges)
-        return K , C1 , C2
+        
+        return K
     
+def plot(g,pos1):
+    global e
+    global pos
+    plt.figure(e, figsize=(10,8))
+    nx.draw_networkx_nodes(g, pos1, node_size=300)
+    nx.draw_networkx_edges(g, pos1, alpha=0.5)
+    nx.draw_networkx_labels(g, pos1, font_size=10)
+    
+    
+def graph(G):
+    global fish
+    global e
+    global pos
+
+    A = nx.to_numpy_array(G, weight="none") #into numpy matrix 
+    m = 78 #total edges
+    fish.append(A)
+    C1,C2 = [],[]
+    C1, C2 = parti(A,G,m)
+    fish.append((C1,C2))
+    print(C1)
+    if C1 == [] or C2 == []:
+        fish.append("YESSS")
+        return G
+    else:
+        K = re(G, C1, C2)
+        
+        Subg1 = K.subgraph(C1).copy()
+        Subg2 = K.subgraph(C2).copy()
+        
+        subg1 = graph(Subg1)
+        subg2 = graph(Subg2)
+        K = nx.compose(subg1, subg2)
+        return K
+        
     
 plt.figure(figsize=(10, 8))
 plt.title("Spectral Modularity Partitioning on Zachary's Karate Club")
 
+D = nx.Graph()
+D.add_nodes_from(["0","1","2"])
+D.add_edges_from([("0","1"),("1","2"),("0","2")])
+
+g = graph(G)
+
+compo = list(nx.connected_components(g))
 pos = nx.spring_layout(G, seed=42)
 plt.figure(1)
-nx.draw(G, with_labels=True)
-
-g,C1,C2 = graph(G)
+nx.draw(G,pos, with_labels=True)
+'''
 nodec = []
-
 for i in G.nodes:
     if i in C1:
         nodec.append("RoyalBlue")
     if i in C2:
         nodec.append("Red")
-
+'''
 plt.figure(2, figsize=(10,8))
-nx.draw_networkx_nodes(g, pos,node_color = nodec, node_size=300)
-nx.draw_networkx_edges(g, pos, alpha=0.5)
-nx.draw_networkx_labels(g, pos, font_size=10)
-plt.plot()
-
-
-
-
-
-
-
-compo = list(nx.connected_components(g))
-subg1, subg2 = [G.subgraph(c).copy() for c in compo]
-
-g,C1,C2 = graph(subg1)
-plt.figure(3, figsize=(10,8))
 nx.draw_networkx_nodes(g, pos, node_size=300)
 nx.draw_networkx_edges(g, pos, alpha=0.5)
 nx.draw_networkx_labels(g, pos, font_size=10)
 plt.plot()
 
-print(G)
-print(g)
-print(subg1)
+print(compo)
+
+A = nx.to_numpy_array(g, weight="none") #into numpy matrix 
+m = (np.sum(A))/2
+B = Calc_B(A, m)
+eigvalues , eigvectors = np.linalg.eig(B)
+ev_max = np.max(eigvalues)
+
+print(nx.algorithms.community.modularity(g,compo))
+
 #%%
 
 def spectral_modularity_bisection(G):
