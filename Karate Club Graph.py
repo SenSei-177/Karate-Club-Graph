@@ -3,36 +3,28 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 G = nx.karate_club_graph()
-H = nx.karate_club_graph()
-fish = []
-Dit = {x:[] for x in range(0, len(G.nodes))}
-f = 0
-
-metricsn =  ("Degree centrality", "Betweenness centrality",
-           "Closeness centrality", "Clustering coefficent" )
-
-Metricsv = {}
-e = 1
-colours = ["Red","RoyalBlue","Green","Yellow","Violet"]
+H = G.copy()
+f,e = 0, 1
+Metrics_Name = ["Degree centrality", "Betweenness centrality",
+           "Closeness centrality", "Clustering coefficent" ]
+Colour_Name = ["Red","RoyalBlue","Green","Yellow","Violet"]
+Metrics_Values = np.zeros((4,34,8))
 
 def Master_B (A,m):
     global Master_B
-    
     k = np.sum(A, axis = 1)
     B = A - ((np.outer(k,k))/(2*m))
     Master_B = B
 
 def Calc_B (g):
     global Master_B
-    
     C = list(g.nodes)
     Idx = np.ix_(*(C,C))
     return Master_B[Idx]
     
-def Mod (B , m):
+def Modularity (B , m):
     
     eigvalues , eigvectors = np.linalg.eigh(B)
-    
     try:
         ev_max = np.max(eigvalues)
     except ValueError:
@@ -46,14 +38,13 @@ def Mod (B , m):
     else:
         return np.zeros(1)
 
-def parti (A,g,m):
+def Partition (A,g,m):
     
     B = Calc_B(g)
-    s = Mod(B, m)
+    s = Modularity(B, m)
     
     if s.any() == bool(np.False_):
-        C1, C2 = [], []
-        
+        C1, C2 = [], [] 
     else:
         community_dict = {node:int(val) for node, val in zip(g.nodes(), s.flatten())}
         C1, C2 = [], []
@@ -64,7 +55,7 @@ def parti (A,g,m):
                 C2.append(i)
     return C1, C2
 
-def re(A,C1,C2):
+def Remove_Edges(A,C1,C2):
     H = G.copy()
     I = G.copy()
     J = G.copy()
@@ -79,102 +70,99 @@ def re(A,C1,C2):
         
     return K
 
-def metrics(g):
-    global Metrics
-    global metricsn
+def Calc_Metrics(g):
+    global Metrics_Name
     global f
-    
-    ddict = np.zeros((34,10))
-    bdict = np.zeros((34,10))
-    csdict = np.zeros((34,10))
-    cldict = np.zeros((34,10))
-    
+    global Metrics_Values
+
     a = nx.degree_centrality(g)
+    
     for i in a.keys():
-        ddict[i][f] = a[i]
+        Metrics_Values[0][i][f:] = a[i]
             
     a = nx.betweenness_centrality(g)
     for i in a.keys():
-        bdict[i][f] = a[i]
+        Metrics_Values[1][i][f:] = a[i]
             
     a = nx.closeness_centrality(g)
     for i in a.keys():
-        csdict[i][f] = a[i]
+        Metrics_Values[2][i][f:] = a[i]
             
     a = nx.clustering(g)
     for i in a.keys():
-        cldict[i][f] = a[i]
+        Metrics_Values[3][i][f:] = a[i]
             
     f += 1
-    return np.stack([ddict, bdict, csdict, cldict])
 
-def plot(g):
+def Plot(g):
     global e
     global pos
     global H
-    global colours
-    global Col
-    global compo
+    global Colour_Name
+    global Colours
+    global Components
     
     H1 = H.copy()
+    H2 = H.copy()
+    H3 = H.copy()
     g1 = g.copy()
-    J = H.copy()
-    K = H.copy()
        
     H1.remove_nodes_from(g1)
 
-    J.remove_edges_from(g1.edges(data=True))
-    J.remove_edges_from(H1.edges(data=True))
-    K.remove_edges_from(J.edges)
+    H2.remove_edges_from(g1.edges(data=True))
+    H2.remove_edges_from(H1.edges(data=True))
+    H3.remove_edges_from(H2.edges)
     
-    if nx.utils.graphs_equal(K,H):
+    if nx.utils.graphs_equal(H3,H):
         return
-    H = K
+    H = H3
     
-    Col = ["Grey"]*34
+    Colours = ["Grey"]*34
     z=0
-    compo = list(nx.connected_components(K))
-    for i in compo:
+    Components = list(nx.connected_components(H))
+    for i in Components:
         for j in i:
-            Col[j] = colours[z]
+            Colours[j] = Colour_Name[z]
         z += 1    
         
     plt.figure(e, figsize=(10,8))
-    nx.draw_networkx_nodes(K, pos ,node_color = Col, node_size=300)
-    nx.draw_networkx_edges(K, pos, alpha=0.5)
-    nx.draw_networkx_labels(K, pos, font_size=10)
+    plt.title(f"After {e-1}th Partitioning")
+    nx.draw_networkx_nodes(H3, pos ,node_color = Colours, node_size=300)
+    nx.draw_networkx_edges(H3, pos, alpha=0.5)
+    nx.draw_networkx_labels(H3, pos, font_size=10)
     e += 1
     
-def graph(G,m):
-    global fish
+def Recursive_Modularity_Clustering(G,m):
     global e
     global pos
-    global Metricsv
+    global Metrics_Values
 
     A = nx.to_numpy_array(G, weight="none") #into numpy matrix
     C1,C2 = [],[]
-    C1, C2 = parti(A,G,m)
+    C1, C2 = Partition(A,G,m)
     if C1 == [] or C2 == []:
         return G
     else:
-        K = re(G, C1, C2)
-        plot(K)
+        K = Remove_Edges(G, C1, C2)
+        Plot(K)
         
         Subg1 = K.subgraph(C1).copy()
         Subg2 = K.subgraph(C2).copy()
-        Metricsv[e] = (metrics(Subg1) + metrics(Subg2))
         
-        subg1 = graph(Subg1,m)
-        subg2 = graph(Subg2,m)
+        Calc_Metrics(Subg1)
+        Calc_Metrics(Subg2)
+        
+        subg1 = Recursive_Modularity_Clustering(Subg1,m)
+        subg2 = Recursive_Modularity_Clustering(Subg2,m)
         K = nx.compose(subg1, subg2)
         
         return K
         
-def Gra(G):
+def Graph(G):
     A = nx.to_numpy_array(G, weight="none") #into numpy matrix 
     m = (np.sum(A))/2
     Master_B(A,m)
-    return graph(G,m)
+    return Recursive_Modularity_Clustering(G,m)
 
 plt.figure(figsize=(10, 8))
 plt.title("Spectral Modularity Partitioning on Zachary's Karate Club")
@@ -184,15 +172,27 @@ plt.figure(1)
 nx.draw(G,pos, with_labels=True)
 e += 1
 
-g = Gra(G)
+g = Graph(G)
 
 plt.figure(e, figsize=(10,8))
 plt.title("Final Communities")
-nx.draw_networkx_nodes(G, pos,node_color = Col, node_size=300)
+nx.draw_networkx_nodes(G, pos,node_color = Colours, node_size=300)
 nx.draw_networkx_edges(g, pos, alpha=0.5)
 nx.draw_networkx_labels(g, pos, font_size=10)
 plt.plot()
+e += 1
+print(nx.algorithms.community.modularity(G,Components))
 
-print(nx.algorithms.community.modularity(G,compo))
+x = [x for x in range(1,9)]
+
+for j in [0,1,2,3]:
+    plt.figure(e, figsize=(10, 9))
+    e += 1
+    for i in range(0,34):
+        plt.title(f"Graph of {Metrics_Name[j]}")
+        plt.xlabel("No. of Splits")
+        plt.ylabel(Metrics_Name[j])
+        plt.plot(x, list(Metrics_Values[j][i]), label= str(i))
+        plt.legend(bbox_to_anchor=(1.05, 1), loc="best")
 
 
