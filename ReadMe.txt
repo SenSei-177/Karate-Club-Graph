@@ -1,2 +1,2 @@
-<H1> Description </H1>
+------ Description -------
 The Python Notebook contains the Spectral Modularity Clustering done in Recursive Algorithm. The popular Karate Club graph is used as example for the algorithm. The graph is visualized after each partition for better understanding. Four Centrality Metrics, namely - Degree Centrality, Betweenness Centrality, Closeness Centrality, Clustering Coefficient are calculated and plotted on a line graph to show their evolution as splitting continues. Further, Nodes of higher importance can be found from these metrics and how the clustering was done around, based on their importance on the graph. The Final Modularity Score is 0.430.
